@@ -2,35 +2,81 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StudentController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\DivisionController;
+use App\Http\Controllers\DistrictController;
 
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
+
+/*
+|--------------------------------------------------------------------------
+| Public Routes
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function () {
-    return view('welcome');
+    return Inertia::render('Welcome', [
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
+        'laravelVersion' => Application::VERSION,
+        'phpVersion' => PHP_VERSION,
+    ]);
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+/*
+|--------------------------------------------------------------------------
+| Authenticated Routes (Admin + Staff)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified'])->group(function () {
 
-Route::middleware('auth')->group(function () {
-    // Breeze profile routes
+    // Dashboard
+    Route::get('/dashboard', function () {
+        return Inertia::render('Dashboard');
+    })->name('dashboard');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Profile Routes
+    |--------------------------------------------------------------------------
+    */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    // ✅ Students UI routes
-    Route::resource('students', StudentController::class);
+    /*
+    |--------------------------------------------------------------------------
+    | Student Routes (Staff can view)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/students', [StudentController::class, 'index'])->name('students.index');
+    Route::get('/students/{student}', [StudentController::class, 'show'])->name('students.show');
 
-    // ✅ Optional filters (ONLY if these methods exist in StudentController)
-    Route::get('/students/division/{division}', [StudentController::class, 'byDivision'])
-        ->name('students.byDivision');
+    /*
+    |--------------------------------------------------------------------------
+    | Admin Routes (Only Admin can create/edit/delete)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['admin'])->group(function () {
 
-    Route::get('/students/district/{district}', [StudentController::class, 'byDistrict'])
-        ->name('students.byDistrict');
+        // Student CRUD (Admin only)
+        Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
+        Route::post('/students', [StudentController::class, 'store'])->name('students.store');
 
-    // If you have this method, you can enable it:
-    // Route::get('/students/division/{division}/district/{district}', [StudentController::class, 'byDivisionDistrict'])
-    //     ->name('students.byDivisionDistrict');
+        Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');
+        Route::put('/students/{student}', [StudentController::class, 'update'])->name('students.update');
+
+        Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
+
+        // Division & District Management (Admin only)
+        Route::resource('divisions', DivisionController::class);
+        Route::resource('districts', DistrictController::class);
+    });
 });
 
-require __DIR__.'/auth.php';
+/*
+|--------------------------------------------------------------------------
+| Auth Routes
+|--------------------------------------------------------------------------
+*/
+require __DIR__ . '/auth.php';
